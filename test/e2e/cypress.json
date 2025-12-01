@@ -1,21 +1,15 @@
 {
   "pluginsFile": false,
   "supportFile": false,
-
-  // Aumentamos el tiempo para evitar fallos por sincronización
   "defaultCommandTimeout": 10000,
   "pageLoadTimeout": 60000,
   "requestTimeout": 10000,
   "responseTimeout": 20000,
-
-  // Reporter JUnit (manteniendo tu configuración original)
   "reporter": "junit",
   "reporterOptions": {
     "mochaFile": "/results/cypress_result.xml",
     "toConsole": false
   },
-
-  // Mantener videos y screenshots para la entrega
   "video": true,
   "screenshotOnRunFailure": true
 }
