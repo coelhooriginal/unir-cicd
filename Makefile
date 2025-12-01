@@ -1,6 +1,3 @@
-# Makefile corregido: se monta volumen para carpeta results y se añade --network-alias calc-web en test-e2e
-# Esto asegura que Cypress pueda resolver calc-web y evita errores de permisos
-
 .PHONY: all $(MAKECMDGOALS)
 
 build:
@@ -13,32 +10,18 @@ server:
 test-unit:
 	docker rm -f unit-tests || true
 	mkdir -p results
-	docker run --name unit-tests \
-		-v $(PWD)/results:/opt/calc/results \
-		--env PYTHONPATH=/opt/calc \
-		-w /opt/calc calculator-app:latest \
-		pytest --cov --cov-report=xml:results/coverage.xml \
-		--cov-report=html:results/coverage \
-		--junit-xml=results/unit_result.xml -m unit
-	docker rm unit-tests
+	docker run --name unit-tests 		-v `pwd`/results:/opt/calc/results 		--env PYTHONPATH=/opt/calc 		-w /opt/calc calculator-app:latest 		pytest --cov --cov-report=xml:results/coverage.xml 		--cov-report=html:results/coverage 		--junit-xml=results/unit_result.xml -m unit
+	docker rm unit-tests || true
 
 test-api:
 	docker network create calc-test-api || true
 	docker rm -f apiserver || true
 	docker rm -f api-tests || true
 	mkdir -p results
-	docker run -d --network calc-test-api \
-		--env PYTHONPATH=/opt/calc --name apiserver \
-		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
-		flask run --host=0.0.0.0
-	docker run --network calc-test-api --name api-tests \
-		-v $(PWD)/results:/opt/calc/results \
-		--env PYTHONPATH=/opt/calc --env BASE_URL=http://apiserver:5000/ \
-		-w /opt/calc calculator-app:latest \
-		pytest --junit-xml=results/api_result.xml -m api
+	docker run -d --network calc-test-api 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
+	docker run --network calc-test-api --name api-tests 		-v `pwd`/results:/opt/calc/results 		--env PYTHONPATH=/opt/calc --env BASE_URL=http://apiserver:5000/ 		-w /opt/calc calculator-app:latest 		pytest --junit-xml=results/api_result.xml -m api
 	docker stop apiserver || true
 	docker rm --force apiserver || true
-	docker stop api-tests || true
 	docker rm --force api-tests || true
 	docker network rm calc-test-api || true
 
@@ -46,26 +29,13 @@ test-e2e:
 	docker network create calc-test-e2e || true
 	docker rm -f apiserver || true
 	docker rm -f calc-web || true
-	docker run -d --rm \
-		--volume `pwd`:/opt/calc --network calc-test-e2e \
-		--env PYTHONPATH=/opt/calc --name apiserver \
-		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
-		flask run --host=0.0.0.0
-	docker run -d --rm \
-		--volume `pwd`/web:/usr/share/nginx/html \
-		--volume `pwd`/web:/etc/nginx/conf.d \
-		--network calc-test-e2e --network-alias calc-web --name calc-web -p 80:80 nginx
+	docker run -d 		--volume `pwd`:/opt/calc --network calc-test-e2e 		--network-alias apiserver 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
+	docker run -d 		--volume `pwd`/web:/usr/share/nginx/html 		--volume `pwd`/web:/etc/nginx/conf.d 		--network calc-test-e2e --network-alias calc-web --name calc-web -p 80:80 nginx
 	mkdir -p results
-	docker run --rm \
-		--volume `pwd`/test/e2e/cypress.json:/cypress.json \
-		--volume `pwd`/test/e2e/cypress:/cypress \
-		--volume `pwd`/results:/results \
-		--network calc-test-e2e cypress/included:4.9.0 \
-		--browser chrome --reporter junit \
-		--reporter-options "mochaFile=/results/e2e_result.xml,toConsole=true"
+	sleep 5
+	docker run --rm 		--volume `pwd`/test/e2e/cypress.json:/cypress.json 		--volume `pwd`/test/e2e/cypress:/cypress 		--volume `pwd`/results:/results 		--network calc-test-e2e cypress/included:4.9.0 		--browser chrome --reporter junit 		--reporter-options "mochaFile=/results/e2e_result.xml,toConsole=true"
 	docker rm --force apiserver || true
 	docker rm --force calc-web || true
-	docker network rm calc-test-e2e || true
 	docker network rm calc-test-e2e || true
 
 run-web:
