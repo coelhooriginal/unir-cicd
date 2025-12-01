@@ -11,7 +11,7 @@ test-unit:
 	docker rm -f unit-tests || true
 	mkdir -p results
 	docker run --name unit-tests 		-v `pwd`/results:/opt/calc/results 		--env PYTHONPATH=/opt/calc 		-w /opt/calc calculator-app:latest 		pytest --cov --cov-report=xml:results/coverage.xml 		--cov-report=html:results/coverage 		--junit-xml=results/unit_result.xml -m unit
-	docker rm unit-tests || true
+	docker rm unit-tests
 
 test-api:
 	docker network create calc-test-api || true
@@ -30,12 +30,12 @@ test-e2e:
 	docker network create calc-test-e2e || true
 	docker rm -f apiserver || true
 	docker rm -f calc-web || true
-	docker run -d 		--volume `pwd`:/opt/calc --network calc-test-e2e 		--network-alias apiserver 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
-	docker run -d 		--volume `pwd`/web:/usr/share/nginx/html 		--volume `pwd`/web:/etc/nginx/conf.d 		--network calc-test-e2e --network-alias calc-web --name calc-web -p 80:80 nginx
+	docker run -d --rm 		--volume `pwd`:/opt/calc --network calc-test-e2e 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
+	docker run -d --rm 		--volume `pwd`/web:/usr/share/nginx/html 		--volume `pwd`/web/nginx.conf:/etc/nginx/conf.d/default.conf 		--network calc-test-e2e --network-alias calc-web --name calc-web -p 80:80 nginx
+	# Esperar que calc-web esté disponible con reintentos
+	@echo "Esperando que calc-web esté disponible..."
+	@for i in 1 2 3 4 5; do 		docker run --rm --network calc-test-e2e curlimages/curl:7.85.0 curl -s http://calc-web && break || sleep 5; 	done
 	mkdir -p results
-	echo "Esperando que calc-web esté disponible..."
-	sleep 10
-	docker run --rm --network calc-test-e2e curlimages/curl:7.85.0 curl -s http://calc-web || (echo "calc-web no responde" && exit 1)
 	docker run --rm 		--volume `pwd`/test/e2e/cypress.json:/cypress.json 		--volume `pwd`/test/e2e/cypress:/cypress 		--volume `pwd`/results:/results 		--network calc-test-e2e cypress/included:4.9.0 		--browser chrome --reporter junit 		--reporter-options "mochaFile=/results/e2e_result.xml,toConsole=true"
 	docker rm --force apiserver || true
 	docker rm --force calc-web || true
@@ -46,23 +46,3 @@ run-web:
 
 stop-web:
 	docker stop calc-web
-
-start-sonar-server:
-	docker network create calc-sonar || true
-	docker run -d --rm --stop-timeout 60 --network calc-sonar --name sonarqube-server -p 9000:9000 --volume `pwd`/sonar/data:/opt/sonarqube/data --volume `pwd`/sonar/logs:/opt/sonarqube/logs sonarqube:8.3.1-community
-
-stop-sonar-server:
-	docker stop sonarqube-server
-	docker network rm calc-sonar || true
-
-start-sonar-scanner:
-	docker run --rm --network calc-sonar -v `pwd`:/usr/src sonarsource/sonar-scanner-cli
-
-pylint:
-	docker run --rm --volume `pwd`:/opt/calc --env PYTHONPATH=/opt/calc -w /opt/calc calculator-app:latest pylint app/ | tee results/pylint_result.txt
-
-deploy-stage:
-	docker stop apiserver || true
-	docker stop calc-web || true
-	docker run -d --rm --name apiserver --network-alias apiserver --env PYTHONPATH=/opt/calc --env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest flask run --host=0.0.0.0
-	docker run -d --rm --name calc-web -p 80:80 calc-web
