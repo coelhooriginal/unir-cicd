@@ -22,6 +22,7 @@ test-api:
 	docker run --network calc-test-api --name api-tests 		-v `pwd`/results:/opt/calc/results 		--env PYTHONPATH=/opt/calc --env BASE_URL=http://apiserver:5000/ 		-w /opt/calc calculator-app:latest 		pytest --junit-xml=results/api_result.xml -m api
 	docker stop apiserver || true
 	docker rm --force apiserver || true
+	docker stop api-tests || true
 	docker rm --force api-tests || true
 	docker network rm calc-test-api || true
 
@@ -32,7 +33,9 @@ test-e2e:
 	docker run -d 		--volume `pwd`:/opt/calc --network calc-test-e2e 		--network-alias apiserver 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
 	docker run -d 		--volume `pwd`/web:/usr/share/nginx/html 		--volume `pwd`/web:/etc/nginx/conf.d 		--network calc-test-e2e --network-alias calc-web --name calc-web -p 80:80 nginx
 	mkdir -p results
-	sleep 5
+	echo "Esperando que calc-web esté disponible..."
+	sleep 10
+	docker run --rm --network calc-test-e2e curlimages/curl:7.85.0 curl -s http://calc-web || (echo "calc-web no responde" && exit 1)
 	docker run --rm 		--volume `pwd`/test/e2e/cypress.json:/cypress.json 		--volume `pwd`/test/e2e/cypress:/cypress 		--volume `pwd`/results:/results 		--network calc-test-e2e cypress/included:4.9.0 		--browser chrome --reporter junit 		--reporter-options "mochaFile=/results/e2e_result.xml,toConsole=true"
 	docker rm --force apiserver || true
 	docker rm --force calc-web || true
