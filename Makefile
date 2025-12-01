@@ -1,5 +1,5 @@
-# Makefile corregido: se monta volumen para carpeta results en test-unit, test-api y test-e2e
-# Esto evita errores de permisos y problemas con coverage en Jenkins
+# Makefile corregido: se monta volumen para carpeta results y se corrige test-e2e para montar carpeta web en /etc/nginx/conf.d
+# Esto evita errores de permisos y problemas de montaje en Jenkins
 
 .PHONY: all $(MAKECMDGOALS)
 
@@ -51,9 +51,9 @@ test-e2e:
 		--env PYTHONPATH=/opt/calc --name apiserver \
 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
 		flask run --host=0.0.0.0
-	docker run -d --rm --volume `pwd`/web:/usr/share/nginx/html \
-		--volume `pwd`/web/constants.test.js:/usr/share/nginx/html/constants.js \
-		--volume `pwd`/web/nginx.conf:/etc/nginx/conf.d/default.conf \
+	docker run -d --rm \
+		--volume `pwd`/web:/usr/share/nginx/html \
+		--volume `pwd`/web:/etc/nginx/conf.d \
 		--network calc-test-e2e --name calc-web -p 80:80 nginx
 	mkdir -p results
 	docker run --rm \
