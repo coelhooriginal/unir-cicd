@@ -1,5 +1,5 @@
-# Makefile corregido: se monta volumen para carpeta results y se corrige test-e2e para montar carpeta web en /etc/nginx/conf.d
-# Esto evita errores de permisos y problemas de montaje en Jenkins
+# Makefile corregido: se monta volumen para carpeta results y se añade --network-alias calc-web en test-e2e
+# Esto asegura que Cypress pueda resolver calc-web y evita errores de permisos
 
 .PHONY: all $(MAKECMDGOALS)
 
@@ -54,7 +54,7 @@ test-e2e:
 	docker run -d --rm \
 		--volume `pwd`/web:/usr/share/nginx/html \
 		--volume `pwd`/web:/etc/nginx/conf.d \
-		--network calc-test-e2e --name calc-web -p 80:80 nginx
+		--network calc-test-e2e --network-alias calc-web --name calc-web -p 80:80 nginx
 	mkdir -p results
 	docker run --rm \
 		--volume `pwd`/test/e2e/cypress.json:/cypress.json \
