@@ -23,6 +23,7 @@ test-api:
 	docker rm --force api-tests || true
 	docker network rm calc-test-api || true
 
+
 test-e2e:
     # Red y limpieza de contenedores previos
     docker network create calc-test-e2e || true
@@ -60,6 +61,7 @@ test-e2e:
     docker rm --force apiserver || true
     docker rm --force calc-web || true
     docker network rm calc-test-e2e || true
+
 
 
 run-web:
