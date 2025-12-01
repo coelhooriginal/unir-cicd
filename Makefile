@@ -1,3 +1,6 @@
+UID := $(shell id -u)
+GID := $(shell id -g)
+
 .PHONY: all $(MAKECMDGOALS)
 
 build:
@@ -9,7 +12,12 @@ server:
 
 test-unit:
 	docker rm -f unit-tests || true
-	docker run --name unit-tests --user $(id -u):$(id -g) 		--env PYTHONPATH=/opt/calc 		-w /opt/calc calculator-app:latest 		sh -c 'pytest --cov --cov-report=xml:results/coverage.xml 		--cov-report=html:results/coverage 		--junit-xml=results/unit_result.xml -m unit'
+	docker run --name unit-tests --user $(UID):$(GID) \
+		--env PYTHONPATH=/opt/calc \
+		-w /opt/calc calculator-app:latest \
+		sh -c 'pytest --cov --cov-report=xml:results/coverage.xml \
+		--cov-report=html:results/coverage \
+		--junit-xml=results/unit_result.xml -m unit'
 	docker cp unit-tests:/opt/calc/results ./
 	docker rm unit-tests
 
@@ -17,8 +25,14 @@ test-api:
 	docker network create calc-test-api || true
 	docker rm -f apiserver || true
 	docker rm -f api-tests || true
-	docker run -d --network calc-test-api --user $(id -u):$(id -g) 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
-	docker run --network calc-test-api --name api-tests --user $(id -u):$(id -g) 		--env PYTHONPATH=/opt/calc --env BASE_URL=http://apiserver:5000/ 		-w /opt/calc calculator-app:latest 		pytest --junit-xml=results/api_result.xml -m api
+	docker run -d --network calc-test-api --user $(UID):$(GID) \
+		--env PYTHONPATH=/opt/calc --name apiserver \
+		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
+		flask run --host=0.0.0.0
+	docker run --network calc-test-api --name api-tests --user $(UID):$(GID) \
+		--env PYTHONPATH=/opt/calc --env BASE_URL=http://apiserver:5000/ \
+		-w /opt/calc calculator-app:latest \
+		pytest --junit-xml=results/api_result.xml -m api
 	docker cp api-tests:/opt/calc/results ./
 	docker stop apiserver || true
 	docker rm --force apiserver || true
@@ -30,10 +44,23 @@ test-e2e:
 	docker network create calc-test-e2e || true
 	docker rm -f apiserver || true
 	docker rm -f calc-web || true
-	docker run -d --rm --user $(id -u):$(id -g) 		--volume `pwd`:/opt/calc --network calc-test-e2e 		--env PYTHONPATH=/opt/calc --name apiserver 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest 		flask run --host=0.0.0.0
-	docker run -d --rm --volume `pwd`/web:/usr/share/nginx/html 		--volume `pwd`/web/constants.test.js:/usr/share/nginx/html/constants.js 		--volume `pwd`/web/nginx.conf:/etc/nginx/conf.d/default.conf 		--network calc-test-e2e --name calc-web -p 80:80 nginx
+	docker run -d --rm --user $(UID):$(GID) \
+		--volume `pwd`:/opt/calc --network calc-test-e2e \
+		--env PYTHONPATH=/opt/calc --name apiserver \
+		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
+		flask run --host=0.0.0.0
+	docker run -d --rm --volume `pwd`/web:/usr/share/nginx/html \
+		--volume `pwd`/web/constants.test.js:/usr/share/nginx/html/constants.js \
+		--volume `pwd`/web/nginx.conf:/etc/nginx/conf.d/default.conf \
+		--network calc-test-e2e --name calc-web -p 80:80 nginx
 	mkdir -p results
-	docker run --rm 		--volume `pwd`/test/e2e/cypress.json:/cypress.json 		--volume `pwd`/test/e2e/cypress:/cypress 		--volume `pwd`/results:/results 		--network calc-test-e2e cypress/included:4.9.0 		--browser chrome --reporter junit 		--reporter-options "mochaFile=/results/e2e_result.xml,toConsole=true"
+	docker run --rm \
+		--volume `pwd`/test/e2e/cypress.json:/cypress.json \
+		--volume `pwd`/test/e2e/cypress:/cypress \
+		--volume `pwd`/results:/results \
+		--network calc-test-e2e cypress/included:4.9.0 \
+		--browser chrome --reporter junit \
+		--reporter-options "mochaFile=/results/e2e_result.xml,toConsole=true"
 	docker rm --force apiserver || true
 	docker rm --force calc-web || true
 	docker network rm calc-test-e2e || true
