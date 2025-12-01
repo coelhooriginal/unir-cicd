@@ -1,5 +1,5 @@
-UID := $(shell id -u)
-GID := $(shell id -g)
+# Makefile corregido: se monta volumen para carpeta results en test-unit, test-api y test-e2e
+# Esto evita errores de permisos y problemas con coverage en Jenkins
 
 .PHONY: all $(MAKECMDGOALS)
 
@@ -12,28 +12,30 @@ server:
 
 test-unit:
 	docker rm -f unit-tests || true
-	docker run --name unit-tests --user $(UID):$(GID) \
+	mkdir -p results
+	docker run --name unit-tests \
+		-v $(PWD)/results:/opt/calc/results \
 		--env PYTHONPATH=/opt/calc \
 		-w /opt/calc calculator-app:latest \
-		sh -c 'pytest --cov --cov-report=xml:results/coverage.xml \
+		pytest --cov --cov-report=xml:results/coverage.xml \
 		--cov-report=html:results/coverage \
-		--junit-xml=results/unit_result.xml -m unit'
-	docker cp unit-tests:/opt/calc/results ./
+		--junit-xml=results/unit_result.xml -m unit
 	docker rm unit-tests
 
 test-api:
 	docker network create calc-test-api || true
 	docker rm -f apiserver || true
 	docker rm -f api-tests || true
-	docker run -d --network calc-test-api --user $(UID):$(GID) \
+	mkdir -p results
+	docker run -d --network calc-test-api \
 		--env PYTHONPATH=/opt/calc --name apiserver \
 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
 		flask run --host=0.0.0.0
-	docker run --network calc-test-api --name api-tests --user $(UID):$(GID) \
+	docker run --network calc-test-api --name api-tests \
+		-v $(PWD)/results:/opt/calc/results \
 		--env PYTHONPATH=/opt/calc --env BASE_URL=http://apiserver:5000/ \
 		-w /opt/calc calculator-app:latest \
 		pytest --junit-xml=results/api_result.xml -m api
-	docker cp api-tests:/opt/calc/results ./
 	docker stop apiserver || true
 	docker rm --force apiserver || true
 	docker stop api-tests || true
@@ -44,7 +46,7 @@ test-e2e:
 	docker network create calc-test-e2e || true
 	docker rm -f apiserver || true
 	docker rm -f calc-web || true
-	docker run -d --rm --user $(UID):$(GID) \
+	docker run -d --rm \
 		--volume `pwd`:/opt/calc --network calc-test-e2e \
 		--env PYTHONPATH=/opt/calc --name apiserver \
 		--env FLASK_APP=app/api.py -p 5000:5000 -w /opt/calc calculator-app:latest \
